@@ -8,23 +8,63 @@ import (
 )
 
 type rethink struct {
-	//db *mgo.Database
+	db *rbd.Session
 }
+
+var (
+	Url = "localhost:28015"
+)
 
 func init() {
 	db.Register(new(rethink))
 }
 
 func (r *rethink) Init() error {
+	rdb.SetTags("gerethink", "json")
+
+	var err error
+	r.db, err = rdb.Connect(rdb.ConnectOpts{
+		Address: Url,
+	})
+
+	if err != nil {
+		return err
+	}
+
+	if _, err = rdb.DBCreate("dsadmin").RunWrite(r.db); err != nil {
+		return err
+	}
+
+	if _, err = rdb.DB("dsadmin").TableCreate("tracing").RunWrite(r.db); err != nil {
+		return err
+	}
+
+	if err = r.db.Close(); err != nil {
+		return err
+	}
+
+	r.db, err = rdb.Connect(rdb.ConnectOpts{
+		Address:  Url,
+		Database: "dsadmin",
+	})
+
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
 func (r *rethink) Create(span *proto.Span) error {
+	if _, err := rdb.Table("tracing").Insert(span).RunWrite(r.db); err != nil {
+		return err
+	}
+
 	return nil
 }
 
 func (r *rethink) Read(traceId string) ([]*proto.Span, error) {
-	return nil, nil
+	rdb.Table("tracing").GetAll(
 }
 
 func (r *rethink) Delete(traceId string) error {
